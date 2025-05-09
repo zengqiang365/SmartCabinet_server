@@ -1,0 +1,34 @@
+{
+    "extends": "eslint-config-egg",
+    "env": {
+      "es6": true,
+      "node": true,
+      "mocha": true
+    },
+    "parserOptions": {
+      "sourceType": "module",
+      "ecmaVersion": 9
+    },
+    "rules": {
+      "indent": [
+        "error",
+        4
+      ],
+      "quotes": [
+        "error",
+        "single"
+      ],
+      "semi": [
+        "error",
+        "always"
+      ],
+      "no-console": 1,
+      "no-unused-vars": 1,
+      "no-return-assign": 0,
+      "valid-jsdoc": 0,
+      "array-bracket-spacing": 0,
+      "comma-dangle": 0,
+      "no-multi-spaces": 0,
+      "no-bitwise": 0
+    }
+  }
