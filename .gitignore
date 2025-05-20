@@ -9,5 +9,11 @@ temp/
 *.swp
 npm-debug.log
 package-lock.json
+yarn-error.log
+yarn.lock
+coverage/
+*.sw*
+*.un~
+.nyc_output/
 *-lock.json
 *-lock.yaml
