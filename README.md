@@ -6,3 +6,19 @@
 [desktop](https://github.com/zengqiang365/SmartCabinet_desktop)：js + electron + vue3  
 
 ---
+
+
+### Development
+
+```bash
+npm i
+npm run dev
+open http://localhost:8022/
+```
+
+### Deploy
+
+```bash
+npm start
+npm stop
+```
