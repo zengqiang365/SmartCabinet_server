@@ -9,13 +9,13 @@ exports.jwt = {
     package: 'egg-jwt',
 };
 
-// exports.mysql = {
-//     enable: true,
-//     package: 'egg-mysql',
-// };
+exports.mysql = {
+    enable: true,
+    package: 'egg-mysql',
+};
 
-// exports.redis = {
-//     enable: true,
-//     package: 'egg-redis',
-// };
+exports.redis = {
+    enable: true,
+    package: 'egg-redis',
+};
 

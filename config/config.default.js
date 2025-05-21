@@ -104,6 +104,14 @@ module.exports = appInfo => {
                 disable: false,
             }
         },
+        mail: {
+            user: 'xx',
+            pass: 'xx',
+            host: 'xx',
+            domain: 'xx',
+            from: 'xx',
+            repairMail: 'xx'
+        },
         lendTime: 7,
     };
 
