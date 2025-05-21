@@ -18,7 +18,8 @@
     "fs-extra": "^11.3.0",
     "lodash": "^4.17.21",
     "moment": "^2.30.1",
-    "nodemailer": "^7.0.3"
+    "nodemailer": "^7.0.3",
+    "smartCabinet_server": "file:"
   },
   "devDependencies": {
     "egg-bin": "6",
