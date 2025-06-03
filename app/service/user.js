@@ -3,6 +3,8 @@
  */
 const _ =  require('lodash');
 const moment = require('moment');
+const path = require('path');
+const fs = require('fs');
 module.exports = app => {
     const Service = require('egg').Service;
     return class userService extends Service {
@@ -19,7 +21,7 @@ module.exports = app => {
 
         // 查找用户
         async findUser(cond) {
-            const sql = 'select a.*, b.permits, b.asset_grads from user a left join role b on a.role_code=b.role_code where a.username = ? and a.password = ?';
+            const sql = 'select a.*, b.permits from user a left join role b on a.role_code=b.role_code where a.username = ? and a.password = ?';
             const userInfo = await app.mysql.query(sql, [cond.username, cond.password]);
             if (!userInfo) {
                 return null;
@@ -28,7 +30,7 @@ module.exports = app => {
         }
         // 按照卡号查找用户
         async findUserByCard(cond) {
-            const sql = 'select a.*, b.permits, b.asset_grads from user a left join role b on a.role_code=b.role_code where a.cardnum = ?';
+            const sql = 'select a.*, b.permits from user a left join role b on a.role_code=b.role_code where a.cardnum = ?';
             const userInfo = await app.mysql.query(sql, [cond.cardnum]);
             if (!userInfo) {
                 return null;
@@ -47,17 +49,42 @@ module.exports = app => {
             return true;
         }
 
+        async checkImage(cond) {
+            const sql = 'select * from userface where user_code= ? order by id desc limit 1';
+            const faceInfos = await app.mysql.query(sql, [cond.user_code]);
+            if (!faceInfos || faceInfos.length == 0) {
+                return false;
+            }
+            const faceInfo = faceInfos[0];
+            const image = cond.image;
+            const imageDesc = await this.ctx.service.face.getBufDescriptor(image); // 获取人脸特征值
+            const myDesc = JSON.parse(faceInfo.face_desc);
+            const distance = await this.ctx.service.face.faceCompare(imageDesc, myDesc); // 获取人脸特征值
+            console.log(distance);
+            if (distance > 0.4) {
+                // 人脸比对失败
+                return false;
+            }
+            const userSql = 'select a.*, b.permits from user a left join role b on a.role_code=b.role_code where a.code = ?';
+            const userInfo = await app.mysql.query(userSql, [cond.user_code]);
+            return userInfo[0];
+        }
+
         // 获取用户的列表
         async getUserList(pageObj, cond) {
-            let userSql = 'select id, code, name, username, cardnum, email, role_code, org_code, reserve_enable from user';
+            let userSql = 'select id, code, name, photo, username, cardnum, email, role_code, org_code, reserve_enable from user where';
             const orgSql = 'select id, org_code, org_name from organization';
             // let sql = 'select a.id, a.code, a.name, a.username, a.cardnum, a.email, a.role_code, a.org_code, b.org_name from user a left join organization b on a.org_code = b.org_code';
             const values = [];
             if (cond && cond.name) {
-                userSql += ' where name like ?';
+                userSql += ' name like ? and';
                 values.push(`%${cond.name}%`);
             }
-            userSql += ` limit ${pageObj.skip},${pageObj.limit}`;
+            if (cond && cond.org_code) {
+                userSql += ' org_code like ? and';
+                values.push(`${cond.org_code}%`);
+            }
+            userSql += ` 1=1 limit ${pageObj.skip},${pageObj.limit}`;
 
             const userInfo = await app.mysql.query(userSql, values.length > 0 ? values : null);
 
@@ -89,9 +116,33 @@ module.exports = app => {
         }
         // 获取用户总数
         async getCount(pageObj, cond) {
-            const totalNum = await app.mysql.count('user', cond);
+            let sql = 'select count(*) as totalnum from user where';
+            const values = [];
+            if (cond && cond.name) {
+                sql += ' name like ? and';
+                values.push(`%${cond.name}%`);
+            }
+            if (cond && cond.org_code) {
+                sql += ' org_code like ? and';
+                values.push(`${cond.org_code}%`);
+            }
+            sql += ' 1=1';
+            const num = await app.mysql.query(sql, values.length > 0 ? values : null);
+            const totalNum = num[0].totalnum;
             const totalPage = Math.ceil(totalNum / pageObj.pageSize);
             return { totalNum, totalPage };
+        }
+
+        // 获取用户的列表
+        async getOrgUsers(cond) {
+            let userSql = 'select id, code, name, org_code from user';
+            const values = [];
+            if (cond && cond.org_code) {
+                userSql += ' where org_code like ?';
+                values.push(`${cond.org_code}%`);
+            }
+            const userInfo = await app.mysql.query(userSql, values.length > 0 ? values : null);
+            return userInfo;
         }
         // 按id查找用户
         async findUserById(id) {
@@ -118,11 +169,17 @@ module.exports = app => {
         // 增加用户
         async addUser(userData) {
             const result = await app.mysql.insert('user', userData);
+            if (userData.photo) {
+                await app.mysql.query('update userface set user_code=? where photo=?', [userData.code, userData.photo]);
+            }
             return result;
         }
         // 修改用户
         async editUser(userData) {
             const result = await app.mysql.update('user', userData);
+            if (userData.photo) {
+                await app.mysql.query('update userface set user_code=? where photo=?', [userData.code, userData.photo]);
+            }
             return result;
         }
         // 删除用户
@@ -202,6 +259,40 @@ module.exports = app => {
         async forbidReserve(code) {
             await app.mysql.query('update user set reserve_enable = ? where code = ?', ['0', code]);
         }
+
+        // 上传设备图片
+        async uploadPhoto(data) {
+            const { ctx } = this;
+            if (!(ctx.request.files && ctx.request.files.length > 0)) { // 如果未收到文件，返回错误
+                return false;
+            }
+            const mpFile = ctx.request.files[0];
+            const tmpFilePath = mpFile.filepath; // 获取文件路径
+
+            const fileName = path.basename(tmpFilePath);
+            // const fileName = this.formatFilePath(data.fileName);
+            // 生成路径名
+            const toFileName = '/public/img/photo/' + fileName;
+            const to = path.join(__dirname, `../public/img/photo/${fileName}`);
+            const desc = await this.ctx.service.face.getDescriptor(tmpFilePath); // 获取人脸特征值
+
+            // await app.mysql.insert('userface', { photo: toFileName, face_desc: desc, upload_time: moment().format('YYYY-MM-DD HH:mm:ss') });
+            await app.mysql.query(`INSERT INTO userface(photo, face_desc, upload_time) values('${toFileName}', JSON_ARRAY(${desc}), '${moment().format('YYYY-MM-DD HH:mm:ss')}')`);
+            // 拷贝图片至本地
+            await fs.copyFileSync(tmpFilePath, to);
+
+            // 返回前端路径
+            return toFileName;
+        }
+
+        // 格式化字符串 去除特殊字符
+        formatFilePath(filePath) {
+            filePath = filePath.replace(/\s*/g, ''); // 去空格
+            filePath = filePath.replace(/\(/g, ''); // 去左括号
+            filePath = filePath.replace(/\)/g, ''); // 去右括号
+            return filePath;
+        }
+
 
     };
 };
